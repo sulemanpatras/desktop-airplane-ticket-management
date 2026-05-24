@@ -133,8 +133,10 @@ public class BookingService {
 
         // Side effects: email + PDF
         try {
-            emailService.sendBookingConfirmation(ticket, flight);
-            pdfService.generateTicketPdf(ticket, flight);
+            // Generate ticket silently to default location (no dialog in service layer)
+            String pdfPath = pdfService.generateTicketPdf(ticket, flight);
+            // Email the PDF as attachment to passenger + alert to admin
+            emailService.sendBookingConfirmationWithAttachment(ticket, flight, pdfPath);
         } catch (Exception e) {
             System.err.println("[BookingService] Post-booking side effect failed: " + e.getMessage());
         }

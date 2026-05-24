@@ -58,3 +58,81 @@ To      : john@example.com
 Subject : ✈ Booking Confirmed – TK10004
 Preview : Your Booking is Confirmed!Ticket IDTK10004PassengerJohn DoeFlightFL002Seat21BPrice Paid$45000.00Book
 
+──────────────────────────────────────────
+Time    : 2026-05-24 08:20:52
+To      : john@example.com
+Subject : SkyBook: Booking Cancelled – TK10001
+Preview : Booking CancelledYour booking TK10001 has been cancelled.Ticket IDTK10001PassengerJohn DoeFlightFL00
+
+──────────────────────────────────────────
+Time    : 2026-05-24 08:24:03
+To      : john@example.com
+Subject : SkyBook: Booking Cancelled – TK10002
+Preview : Booking CancelledYour booking TK10002 has been cancelled.Ticket IDTK10002PassengerJohn DoeFlightFL00
+
+──────────────────────────────────────────
+Time    : 2026-05-24 09:10:07
+To      : papugabbar@gmail.com
+Subject : SkyBook: Your profile has been updated
+Preview : Profile UpdatedHello Papu2,Your SkyBook profile has been updated. The following changes were made:Fu
+
+──────────────────────────────────────────
+Time    : 2026-05-24 09:10:31
+To      : papugabbar@gmail.com
+Subject : SkyBook: Your profile has been updated
+Preview : Profile UpdatedHello Papu,Your SkyBook profile has been updated. The following changes were made:Ful
+
+──────────────────────────────────────────
+Time    : 2026-05-24 09:11:36
+To      : papugabbar@gmail.com
+Subject : ✈ Booking Confirmed – TK10005
+Preview : Your Booking is Confirmed!Hello Papu, your flight has been booked successfully.Ticket IDTK10005Fligh
+
+──────────────────────────────────────────
+Time    : 2026-05-24 09:11:36
+To      : admin@skybook.com
+Subject : New Booking Alert – TK10005 by Papu
+Preview : New Booking ReceivedA passenger has booked a ticket. Details below:Ticket IDTK10005Passenger NamePap
+
+──────────────────────────────────────────
+Time    : 2026-05-24 09:13:01
+To      : sulemanpatras2@gmail.com
+Subject : SkyBook: Your profile has been updated
+Preview : Profile UpdatedHello System Admin,Your SkyBook profile has been updated. The following changes were 
+
+──────────────────────────────────────────
+Time    : 2026-05-24 10:06:47
+To      : john@example.com
+Subject : ✈ Booking Confirmed – TK10006
+Preview : Your Booking is Confirmed!Hello John Doe, your flight has been booked successfully.Ticket IDTK10006F
+
+──────────────────────────────────────────
+Time    : 2026-05-24 10:06:47
+To      : admin@skybook.com
+Subject : New Booking Alert – TK10006 by John Doe
+Preview : New Booking ReceivedA passenger has booked a ticket. Details below:Ticket IDTK10006Passenger NameJoh
+
+──────────────────────────────────────────
+Time    : 2026-05-24 10:27:57
+To      : papugabbar@gmail.com
+Subject : ✈ Booking Confirmed – TK10007
+Preview : Your Booking is Confirmed!Hello Papu, your flight has been booked successfully.Ticket IDTK10007Fligh
+
+──────────────────────────────────────────
+Time    : 2026-05-24 10:27:57
+To      : admin@skybook.com
+Subject : New Booking Alert – TK10007 by Papu
+Preview : New Booking ReceivedA passenger has booked a ticket. Details below:Ticket IDTK10007Passenger NamePap
+
+──────────────────────────────────────────
+Time    : 2026-05-24 10:50:07
+To      : papugabbar@gmail.com
+Subject : ✈ Booking Confirmed – TK10008
+Preview : Your Booking is Confirmed!Hello Papu, your flight has been booked successfully.Ticket IDTK10008Fligh
+
+──────────────────────────────────────────
+Time    : 2026-05-24 10:50:07
+To      : admin@skybook.com
+Subject : New Booking Alert – TK10008 by Papu
+Preview : New Booking ReceivedA passenger has booked a ticket. Details below:Ticket IDTK10008Passenger NamePap
+

@@ -12,11 +12,11 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * AuthService: Handles user registration, login, and session management.
- * Demonstrates: File handling, Exception handling, Security (password hashing)
+ * AuthService: Handles user registration, login, session management, and profile updates.
  *
- * NOTE: Uses SHA-256 + salt for password hashing (no external BCrypt dependency needed).
- * To use BCrypt: add org.mindrot:jbcrypt:0.4 to classpath and swap hashPassword/verifyPassword.
+ * FIX 6: Registration no longer exposes role selection — new users are always PASSENGER.
+ * FIX 5: Added updateProfile() method; sends confirmation email to the user (not admin).
+ * FIX 7: Admin can create/update any user; email sent to affected user only.
  */
 public class AuthService {
 
@@ -25,7 +25,7 @@ public class AuthService {
 
     private static AuthService instance;
     private List<User> users;
-    private User currentUser; // logged-in session
+    private User currentUser;
 
     private AuthService() {
         ensureFile();
@@ -40,9 +40,6 @@ public class AuthService {
 
     // ─── AUTH ────────────────────────────────────────────────────────────────────
 
-    /**
-     * Logs in a user. Returns the User if credentials match, throws otherwise.
-     */
     public User login(String username, String password) throws Exception {
         if (username == null || username.isBlank())
             throw new Exception("Username is required.");
@@ -71,18 +68,27 @@ public class AuthService {
     }
 
     public User getCurrentUser() { return currentUser; }
-    public boolean isLoggedIn() { return currentUser != null; }
-
-    public boolean isAdmin() { return isLoggedIn() && currentUser.getRole() == User.Role.ADMIN; }
-    public boolean isStaff() { return isLoggedIn() &&
+    public boolean isLoggedIn()  { return currentUser != null; }
+    public boolean isAdmin()     { return isLoggedIn() && currentUser.getRole() == User.Role.ADMIN; }
+    public boolean isStaff()     { return isLoggedIn() &&
             (currentUser.getRole() == User.Role.STAFF || currentUser.getRole() == User.Role.ADMIN); }
 
-    // ─── REGISTRATION ────────────────────────────────────────────────────────────
+    // ─── REGISTRATION (FIX 6: always PASSENGER, no role choice) ─────────────────
 
+    /**
+     * Public self-registration — role is always PASSENGER.
+     */
+    public User register(String username, String password, String confirmPassword,
+                         String email, String fullName) throws Exception {
+        return register(username, password, confirmPassword, email, fullName, User.Role.PASSENGER);
+    }
+
+    /**
+     * Internal/admin registration — caller specifies role.
+     */
     public User register(String username, String password, String confirmPassword,
                          String email, String fullName, User.Role role) throws Exception {
 
-        // Validation
         if (username == null || username.trim().length() < 3)
             throw new Exception("Username must be at least 3 characters.");
         if (password == null || password.length() < 6)
@@ -94,7 +100,6 @@ public class AuthService {
         if (fullName == null || fullName.trim().isEmpty())
             throw new Exception("Full name is required.");
 
-        // Check duplicate
         boolean exists = users.stream()
                 .anyMatch(u -> u.getUsername().equalsIgnoreCase(username.trim()));
         if (exists)
@@ -105,10 +110,9 @@ public class AuthService {
         if (emailExists)
             throw new Exception("An account with this email already exists.");
 
-        // Create user
-        String id = "U" + String.format("%03d", users.size() + 1);
+        String id   = "U" + String.format("%03d", users.size() + 1);
         String hash = hashPassword(password);
-        User user = new User(id, username.trim(), hash, email.trim(), fullName.trim(), role);
+        User user   = new User(id, username.trim(), hash, email.trim(), fullName.trim(), role);
 
         users.add(user);
         saveUsers();
@@ -116,9 +120,134 @@ public class AuthService {
         return user;
     }
 
+    // ─── PROFILE UPDATE (FIX 5) ──────────────────────────────────────────────────
+
+    /**
+     * Updates profile fields for the given userId.
+     * Sends a profile-update confirmation email to the user only.
+     *
+     * @param userId        target user
+     * @param newFullName   new display name (null = no change)
+     * @param newUsername   new username (null = no change)
+     * @param newEmail      new email (null = no change)
+     * @param oldPassword   current password (required for password change)
+     * @param newPassword   new password (null = no change)
+     */
+    public void updateProfile(String userId,
+                              String newFullName,
+                              String newUsername,
+                              String newEmail,
+                              String oldPassword,
+                              String newPassword) throws Exception {
+
+        User u = users.stream().filter(x -> x.getId().equals(userId))
+                .findFirst().orElseThrow(() -> new Exception("User not found."));
+
+        List<String> changes = new ArrayList<>();
+
+        // Full name
+        if (newFullName != null && !newFullName.trim().isEmpty()
+                && !newFullName.trim().equals(u.getFullName())) {
+            u.setFullName(newFullName.trim());
+            changes.add("Full name updated");
+        }
+
+        // Username
+        if (newUsername != null && !newUsername.trim().isEmpty()
+                && !newUsername.trim().equalsIgnoreCase(u.getUsername())) {
+            if (newUsername.trim().length() < 3)
+                throw new Exception("Username must be at least 3 characters.");
+            boolean taken = users.stream()
+                    .anyMatch(x -> !x.getId().equals(userId)
+                            && x.getUsername().equalsIgnoreCase(newUsername.trim()));
+            if (taken) throw new Exception("Username '" + newUsername + "' is already taken.");
+            u.setUsername(newUsername.trim());
+            changes.add("Username updated");
+        }
+
+        // Email
+        if (newEmail != null && !newEmail.trim().isEmpty()
+                && !newEmail.trim().equalsIgnoreCase(u.getEmail())) {
+            if (!newEmail.contains("@")) throw new Exception("Invalid email address.");
+            boolean taken = users.stream()
+                    .anyMatch(x -> !x.getId().equals(userId)
+                            && x.getEmail().equalsIgnoreCase(newEmail.trim()));
+            if (taken) throw new Exception("This email is already in use.");
+            u.setEmail(newEmail.trim());
+            changes.add("Email updated");
+        }
+
+        // Password
+        if (newPassword != null && !newPassword.isEmpty()) {
+            if (oldPassword == null || !verifyPassword(oldPassword, u.getPasswordHash()))
+                throw new Exception("Current password is incorrect.");
+            if (newPassword.length() < 6)
+                throw new Exception("New password must be at least 6 characters.");
+            u.setPasswordHash(hashPassword(newPassword));
+            changes.add("Password changed");
+        }
+
+        if (changes.isEmpty()) throw new Exception("No changes were made.");
+
+        saveUsers();
+
+        // Reflect changes in current session if same user
+        if (currentUser != null && currentUser.getId().equals(userId)) {
+            this.currentUser = u;
+        }
+
+        // Send email to the user (not admin) — FIX 5
+        try {
+            EmailService emailService = new EmailService();
+            emailService.sendProfileUpdateNotification(u, changes);
+        } catch (Exception e) {
+            System.err.println("[AuthService] Profile email failed: " + e.getMessage());
+        }
+    }
+
+    // ─── ADMIN: UPDATE ANY USER (FIX 7) ─────────────────────────────────────────
+
+    /**
+     * Admin-only: update any user's details and role.
+     * Sends email to the updated user only.
+     */
+    public void adminUpdateUser(String userId, String newFullName, String newUsername,
+                                String newEmail, User.Role newRole) throws Exception {
+        User u = users.stream().filter(x -> x.getId().equals(userId))
+                .findFirst().orElseThrow(() -> new Exception("User not found."));
+
+        List<String> changes = new ArrayList<>();
+
+        if (newFullName != null && !newFullName.trim().isEmpty()) {
+            u.setFullName(newFullName.trim()); changes.add("Full name updated"); }
+        if (newUsername != null && !newUsername.trim().isEmpty()) {
+            boolean taken = users.stream().anyMatch(x -> !x.getId().equals(userId)
+                    && x.getUsername().equalsIgnoreCase(newUsername.trim()));
+            if (taken) throw new Exception("Username already taken.");
+            u.setUsername(newUsername.trim()); changes.add("Username updated"); }
+        if (newEmail != null && !newEmail.trim().isEmpty()) {
+            if (!newEmail.contains("@")) throw new Exception("Invalid email.");
+            u.setEmail(newEmail.trim()); changes.add("Email updated"); }
+        if (newRole != null && newRole != u.getRole()) {
+            u.setRole(newRole); changes.add("Role changed to " + newRole.name()); }
+
+        if (changes.isEmpty()) throw new Exception("No changes made.");
+        saveUsers();
+
+        try {
+            new EmailService().sendProfileUpdateNotification(u, changes);
+        } catch (Exception e) {
+            System.err.println("[AuthService] Admin-update email failed: " + e.getMessage());
+        }
+    }
+
     // ─── USER MANAGEMENT ─────────────────────────────────────────────────────────
 
     public List<User> getAllUsers() { return new ArrayList<>(users); }
+
+    public Optional<User> findUserById(String userId) {
+        return users.stream().filter(u -> u.getId().equals(userId)).findFirst();
+    }
 
     public void deactivateUser(String userId) throws Exception {
         User u = users.stream().filter(x -> x.getId().equals(userId))
@@ -140,23 +269,16 @@ public class AuthService {
 
     // ─── PASSWORD HASHING ────────────────────────────────────────────────────────
 
-    /**
-     * Hash password with SHA-256 + random salt.
-     * Format: base64(salt):base64(sha256(salt+password))
-     */
     public static String hashPassword(String password) {
         try {
             SecureRandom rng = new SecureRandom();
             byte[] salt = new byte[16];
             rng.nextBytes(salt);
-
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             md.update(salt);
             byte[] hash = md.digest(password.getBytes("UTF-8"));
-
-            String saltB64 = Base64.getEncoder().encodeToString(salt);
-            String hashB64 = Base64.getEncoder().encodeToString(hash);
-            return saltB64 + ":" + hashB64;
+            return Base64.getEncoder().encodeToString(salt)
+                 + ":" + Base64.getEncoder().encodeToString(hash);
         } catch (Exception e) {
             throw new RuntimeException("Password hashing failed", e);
         }
@@ -166,14 +288,11 @@ public class AuthService {
         try {
             String[] parts = stored.split(":", 2);
             if (parts.length != 2) return false;
-
-            byte[] salt = Base64.getDecoder().decode(parts[0]);
+            byte[] salt         = Base64.getDecoder().decode(parts[0]);
             byte[] expectedHash = Base64.getDecoder().decode(parts[1]);
-
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             md.update(salt);
             byte[] actualHash = md.digest(password.getBytes("UTF-8"));
-
             if (actualHash.length != expectedHash.length) return false;
             int diff = 0;
             for (int i = 0; i < actualHash.length; i++) diff |= actualHash[i] ^ expectedHash[i];
@@ -218,15 +337,12 @@ public class AuthService {
         }
     }
 
-    /**
-     * Seeds default users on first run.
-     */
     private void seedDefaultUsers() {
         if (!users.isEmpty()) return;
         try {
-            register("admin",     "admin123",  "admin123",  "admin@skybook.com",    "System Admin",    User.Role.ADMIN);
-            register("staff1",    "staff123",  "staff123",  "staff@skybook.com",    "Ground Staff",    User.Role.STAFF);
-            register("passenger", "pass123",   "pass123",   "passenger@skybook.com","John Passenger",  User.Role.PASSENGER);
+            register("admin",     "admin123", "admin123", "admin@skybook.com",    "System Admin",   User.Role.ADMIN);
+            register("staff1",    "staff123", "staff123", "staff@skybook.com",    "Ground Staff",   User.Role.STAFF);
+            register("passenger", "pass123",  "pass123",  "passenger@skybook.com","John Passenger", User.Role.PASSENGER);
             System.out.println("[AuthService] Default users seeded.");
         } catch (Exception e) {
             System.err.println("[AuthService] Seed error: " + e.getMessage());

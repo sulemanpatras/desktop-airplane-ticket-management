@@ -9,6 +9,7 @@ import skybook.exceptions.FlightNotFoundException;
 import skybook.exceptions.InvalidBookingException;
 import skybook.exceptions.NoSeatsAvailableException;
 import skybook.models.Flight;
+import skybook.services.AuthService;
 import skybook.services.BookingService;
 import skybook.services.GoogleCalendarService;
 import skybook.services.PdfService;
@@ -16,18 +17,18 @@ import skybook.models.Ticket;
 
 import java.util.List;
 
-/**
- * Search Flights Screen.
- *
- * Updates:
- *  - After booking, shows "📅 Add to Google Calendar" button.
- *  - PDF/ticket is saved via FileChooser dialog (user picks destination).
- */
 public class SearchFlightsScreen {
 
     private final BookingService bookingService;
     private final Stage stage;
+    private final AuthService authService;
     private VBox resultsBox;
+
+    // Track whether we are currently showing filtered results
+    private boolean isFiltered = false;
+
+    private Button searchBtn;
+    private Button showAllBtn;
 
     private final GoogleCalendarService calendarService = new GoogleCalendarService();
     private final PdfService pdfService = new PdfService();
@@ -35,6 +36,7 @@ public class SearchFlightsScreen {
     public SearchFlightsScreen(BookingService bookingService, Stage stage) {
         this.bookingService = bookingService;
         this.stage = stage;
+        this.authService = AuthService.getInstance();
     }
 
     public VBox getView() {
@@ -56,8 +58,12 @@ public class SearchFlightsScreen {
         TextField fromField = styledField("e.g. Karachi");
         TextField toField   = styledField("e.g. Lahore");
 
-        Button searchBtn  = actionBtn("🔍 Search",  "#38bdf8", "#0f172a");
-        Button showAllBtn = actionBtn("Show All",   "#334155", "#cbd5e1");
+        searchBtn  = actionBtn("🔍 Search", "#38bdf8", "#0f172a");
+        showAllBtn = actionBtn("Show All",  "#334155", "#cbd5e1");
+
+        // Initially only Search is visible; Show All hidden until a search is active
+        showAllBtn.setVisible(false);
+        showAllBtn.setManaged(false);
 
         searchGrid.add(styledLabel("From"), 0, 0);
         searchGrid.add(fromField, 1, 0);
@@ -67,10 +73,26 @@ public class SearchFlightsScreen {
 
         resultsBox = new VBox(12);
 
-        searchBtn.setOnAction(e -> doSearch(fromField.getText(), toField.getText()));
-        showAllBtn.setOnAction(e -> { fromField.clear(); toField.clear(); doSearch("", ""); });
+        searchBtn.setOnAction(e -> {
+            String from = fromField.getText().trim();
+            String to   = toField.getText().trim();
 
-        doSearch("", "");
+            // Only treat as a filtered search if at least one field is filled
+            if (from.isEmpty() && to.isEmpty()) {
+                doSearch("", "", false);
+            } else {
+                doSearch(from, to, true);
+            }
+        });
+
+        showAllBtn.setOnAction(e -> {
+            fromField.clear();
+            toField.clear();
+            doSearch("", "", false);
+        });
+
+        // Load all flights on open — no filter active
+        doSearch("", "", false);
 
         ScrollPane scroll = new ScrollPane(resultsBox);
         scroll.setFitToWidth(true);
@@ -81,18 +103,40 @@ public class SearchFlightsScreen {
         return view;
     }
 
-    private void doSearch(String from, String to) {
+    /**
+     * @param filtered  true  → user ran a real search; show "Show All", hide "Search"
+     *                  false → showing all flights; show "Search", hide "Show All"
+     */
+    private void doSearch(String from, String to, boolean filtered) {
         resultsBox.getChildren().clear();
         List<Flight> results = bookingService.searchFlights(from, to);
 
         if (results.isEmpty()) {
+            // No results — show neither button active; reset to Search visible
+            setFilteredMode(false);
+
             Label empty = new Label("No flights found. Try adjusting your search.");
             empty.setStyle("-fx-text-fill: #64748b; -fx-font-size: 14px;");
             empty.setPadding(new Insets(30));
             resultsBox.getChildren().add(empty);
             return;
         }
+
+        // Results found — set button visibility based on whether this was filtered
+        setFilteredMode(filtered);
+
         for (Flight f : results) resultsBox.getChildren().add(buildFlightCard(f));
+    }
+
+    /**
+     * filtered=true  → hide Search button, show Show All button
+     * filtered=false → show Search button, hide Show All button
+     */
+    private void setFilteredMode(boolean filtered) {
+        searchBtn.setVisible(!filtered);
+        searchBtn.setManaged(!filtered);
+        showAllBtn.setVisible(filtered);
+        showAllBtn.setManaged(filtered);
     }
 
     private VBox buildFlightCard(Flight flight) {
@@ -170,8 +214,12 @@ public class SearchFlightsScreen {
         form.setVgap(14);
         form.setPadding(new Insets(20));
 
-        TextField nameField  = new TextField("John Doe");
-        TextField emailField = new TextField("john@example.com");
+        skybook.models.User currentUser = authService.getCurrentUser();
+        String prefillName  = (currentUser != null) ? currentUser.getFullName() : "";
+        String prefillEmail = (currentUser != null) ? currentUser.getEmail()    : "";
+
+        TextField nameField  = new TextField(prefillName);
+        TextField emailField = new TextField(prefillEmail);
 
         form.add(new Label("Passenger Name:"), 0, 0);
         form.add(nameField, 1, 0);
@@ -189,14 +237,9 @@ public class SearchFlightsScreen {
                             nameField.getText().trim(),
                             emailField.getText().trim()
                     );
-
-                    // Show save dialog for boarding pass
                     String savedPath = pdfService.generateTicketPdf(ticket, flight, stage);
-
-                    // Show success with calendar option
                     showBookingSuccess(ticket, flight, savedPath);
-                    doSearch("", "");
-
+                    doSearch("", "", false);
                 } catch (NoSeatsAvailableException ex) {
                     showError("No Seats Available", ex.getMessage());
                 } catch (FlightNotFoundException ex) {
@@ -210,9 +253,6 @@ public class SearchFlightsScreen {
         });
     }
 
-    /**
-     * Shows a success alert with an "Add to Google Calendar" button.
-     */
     private void showBookingSuccess(Ticket ticket, Flight flight, String savedPath) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Booking Confirmed!");
@@ -223,15 +263,10 @@ public class SearchFlightsScreen {
               + (savedPath != null ? "Saved to  : " + savedPath + "\n" : "")
               + "\nA confirmation email has been sent."
         );
-
-        // Custom "Add to Calendar" button
         ButtonType calendarBtn = new ButtonType("📅 Add to Google Calendar", ButtonBar.ButtonData.LEFT);
         alert.getButtonTypes().add(calendarBtn);
-
         alert.showAndWait().ifPresent(btn -> {
-            if (btn == calendarBtn) {
-                calendarService.addFlightToCalendar(ticket, flight);
-            }
+            if (btn == calendarBtn) calendarService.addFlightToCalendar(ticket, flight);
         });
     }
 

@@ -6,15 +6,12 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 import skybook.models.User;
 import skybook.services.AuthService;
 
 /**
- * Login Screen – authenticates users and routes to main app.
- * Demonstrates: JavaFX layouts, event handling, custom styling
+ * Login Screen with show/hide password toggle on all password fields.
  */
 public class LoginScreen {
 
@@ -23,19 +20,28 @@ public class LoginScreen {
     private Label errorLabel;
 
     public LoginScreen(AuthService authService, Runnable onLoginSuccess) {
-        this.authService = authService;
+        this.authService    = authService;
         this.onLoginSuccess = onLoginSuccess;
     }
 
     public StackPane getView() {
-        // Root
         StackPane root = new StackPane();
         root.setStyle("-fx-background-color: #0f172a;");
-
-        // Background decorative circles
         root.getChildren().add(buildBackground());
 
-        // Card
+        VBox card = buildLoginCard();
+        StackPane.setAlignment(card, Pos.CENTER);
+        root.getChildren().add(card);
+
+        FadeTransition ft = new FadeTransition(Duration.millis(500), card);
+        ft.setFromValue(0); ft.setToValue(1); ft.play();
+
+        return root;
+    }
+
+    // ─── LOGIN CARD ──────────────────────────────────────────────────────────
+
+    private VBox buildLoginCard() {
         VBox card = new VBox(20);
         card.setMaxWidth(420);
         card.setPadding(new Insets(40));
@@ -45,290 +51,255 @@ public class LoginScreen {
             -fx-background-radius: 16;
             -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 30, 0, 0, 8);
         """);
+        populateLoginCard(card);
+        return card;
+    }
 
-        // Logo
-        VBox logoBox = new VBox(4);
-        logoBox.setAlignment(Pos.CENTER);
-        Label logo = new Label("✈ SkyBook");
-        logo.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #38bdf8;");
-        Label tagline = new Label("Airline Ticket Management");
-        tagline.setStyle("-fx-font-size: 13px; -fx-text-fill: #64748b;");
-        logoBox.getChildren().addAll(logo, tagline);
+    private void populateLoginCard(VBox card) {
+        card.getChildren().clear();
 
-        Separator sep = new Separator();
-        sep.setStyle("-fx-background-color: #334155;");
+        VBox logoBox  = buildLogo("Airline Ticket Management");
+        Separator sep = buildSep();
 
-        // Form
         VBox form = new VBox(14);
 
-        Label userLbl = fieldLabel("Username");
+        Label userLbl      = fieldLabel("Username");
         TextField usernameField = styledField("Enter your username");
 
-        Label passLbl = fieldLabel("Password");
+        Label passLbl      = fieldLabel("Password");
         PasswordField passwordField = new PasswordField();
         passwordField.setPromptText("Enter your password");
         styleTextField(passwordField);
+
+        // ── Show/hide password row ────────────────────────────────────────
+        HBox passwordRow = buildPasswordRow(passwordField);
 
         errorLabel = new Label("");
         errorLabel.setStyle("-fx-text-fill: #f87171; -fx-font-size: 12px;");
         errorLabel.setWrapText(true);
 
-        Button loginBtn = new Button("Sign In");
-        loginBtn.setMaxWidth(Double.MAX_VALUE);
-        loginBtn.setStyle("""
-            -fx-background-color: #38bdf8;
-            -fx-text-fill: #0f172a;
-            -fx-font-weight: bold;
-            -fx-font-size: 14px;
-            -fx-padding: 12 0;
-            -fx-background-radius: 8;
-            -fx-cursor: hand;
-        """);
-        loginBtn.setOnMouseEntered(e -> loginBtn.setStyle("""
-            -fx-background-color: #0ea5e9;
-            -fx-text-fill: #0f172a;
-            -fx-font-weight: bold;
-            -fx-font-size: 14px;
-            -fx-padding: 12 0;
-            -fx-background-radius: 8;
-            -fx-cursor: hand;
-        """));
-        loginBtn.setOnMouseExited(e -> loginBtn.setStyle("""
-            -fx-background-color: #38bdf8;
-            -fx-text-fill: #0f172a;
-            -fx-font-weight: bold;
-            -fx-font-size: 14px;
-            -fx-padding: 12 0;
-            -fx-background-radius: 8;
-            -fx-cursor: hand;
-        """));
-
+        Button loginBtn = primaryBtn("Sign In", "#38bdf8", "#0f172a");
         loginBtn.setOnAction(e -> doLogin(usernameField.getText(), passwordField.getText()));
-
-        // Allow Enter key
         passwordField.setOnAction(e -> doLogin(usernameField.getText(), passwordField.getText()));
         usernameField.setOnAction(e -> passwordField.requestFocus());
 
-        // Register link
         HBox registerRow = new HBox(6);
         registerRow.setAlignment(Pos.CENTER);
         Label noAcct = new Label("Don't have an account?");
         noAcct.setStyle("-fx-text-fill: #64748b; -fx-font-size: 12px;");
         Hyperlink registerLink = new Hyperlink("Register here");
         registerLink.setStyle("-fx-text-fill: #38bdf8; -fx-font-size: 12px; -fx-border-color: transparent;");
-        registerLink.setOnAction(e -> showRegisterPanel(card, loginBtn, form, usernameField, passwordField));
+        registerLink.setOnAction(e -> showRegisterPanel(card));
         registerRow.getChildren().addAll(noAcct, registerLink);
 
-        // Demo credentials hint
         VBox demoBox = new VBox(4);
-        demoBox.setPadding(new Insets(10, 0, 0, 0));
         demoBox.setStyle("-fx-background-color: #0f172a; -fx-background-radius: 6; -fx-padding: 10;");
         Label demoTitle = new Label("Demo credentials:");
         demoTitle.setStyle("-fx-text-fill: #475569; -fx-font-size: 11px; -fx-font-weight: bold;");
-        Label demoAdmin = new Label("admin / admin123  (ADMIN)");
-        Label demoStaff = new Label("staff1 / staff123  (STAFF)");
-        Label demoPax   = new Label("passenger / pass123  (PASSENGER)");
-        for (Label l : new Label[]{demoAdmin, demoStaff, demoPax})
+        for (Label l : new Label[]{
+                new Label("admin / admin123  (ADMIN)"),
+                new Label("staff1 / staff123  (STAFF)"),
+                new Label("passenger / pass123  (PASSENGER)")}) {
             l.setStyle("-fx-text-fill: #475569; -fx-font-size: 11px; -fx-font-family: monospace;");
-        demoBox.getChildren().addAll(demoTitle, demoAdmin, demoStaff, demoPax);
-
-        form.getChildren().addAll(userLbl, usernameField, passLbl, passwordField, errorLabel, loginBtn);
-        card.getChildren().addAll(logoBox, sep, form, registerRow, demoBox);
-
-        StackPane.setAlignment(card, Pos.CENTER);
-        root.getChildren().add(card);
-
-        // Fade in
-        FadeTransition ft = new FadeTransition(Duration.millis(500), card);
-        ft.setFromValue(0);
-        ft.setToValue(1);
-        ft.play();
-
-        return root;
-    }
-
-    private void doLogin(String username, String password) {
-        errorLabel.setText("");
-        try {
-            User user = authService.login(username, password);
-            onLoginSuccess.run();
-        } catch (Exception e) {
-            errorLabel.setText("⚠ " + e.getMessage());
-
-            FadeTransition shake = new FadeTransition(Duration.millis(100), errorLabel);
-            shake.setFromValue(0);
-            shake.setToValue(1);
-            shake.play();
+            demoBox.getChildren().add(l);
         }
+        demoBox.getChildren().add(0, demoTitle);
+
+        form.getChildren().addAll(
+            userLbl, usernameField,
+            passLbl, passwordRow,
+            errorLabel, loginBtn
+        );
+        card.getChildren().addAll(logoBox, sep, form, registerRow, demoBox);
     }
 
-    /**
-     * Transforms the login card into a registration form in-place.
-     */
-    private void showRegisterPanel(VBox card, Button loginBtn, VBox loginForm,
-                                   TextField usernameField, PasswordField passwordField) {
+    // ─── REGISTER PANEL ──────────────────────────────────────────────────────
+
+    private void showRegisterPanel(VBox card) {
         card.getChildren().clear();
+        card.setMaxWidth(440);
 
-        // Header
-        VBox logoBox = new VBox(4);
-        logoBox.setAlignment(Pos.CENTER);
-        Label logo = new Label("✈ SkyBook");
-        logo.setStyle("-fx-font-size: 28px; -fx-font-weight: bold; -fx-text-fill: #38bdf8;");
-        Label tagline = new Label("Create Your Account");
-        tagline.setStyle("-fx-font-size: 13px; -fx-text-fill: #64748b;");
-        logoBox.getChildren().addAll(logo, tagline);
+        VBox logoBox  = buildLogo("Create Your Account");
+        Separator sep = buildSep();
 
-        Separator sep = new Separator();
-        sep.setStyle("-fx-background-color: #334155;");
+        TextField fullNameField    = styledField("Full Name");
+        TextField regUsernameField = styledField("Username (min 3 chars)");
+        TextField emailField       = styledField("Email Address");
 
-        // Registration form
-        VBox form = new VBox(10);
-
-        TextField fullNameField = styledField("Full Name");
-        TextField regUsernameField = styledField("Username");
-        TextField emailField = styledField("Email Address");
         PasswordField regPassField = new PasswordField();
         regPassField.setPromptText("Password (min 6 chars)");
         styleTextField(regPassField);
+
         PasswordField confirmPassField = new PasswordField();
         confirmPassField.setPromptText("Confirm Password");
         styleTextField(confirmPassField);
 
-        // Role selection (Passengers only — admin/staff set by admin)
-        Label roleLbl = fieldLabel("Account Type");
-        ComboBox<String> roleBox = new ComboBox<>();
-        roleBox.getItems().addAll("Passenger", "Staff");
-        roleBox.setValue("Passenger");
-        roleBox.setMaxWidth(Double.MAX_VALUE);
-        roleBox.setStyle("""
-            -fx-background-color: #0f172a;
-            -fx-text-fill: #f1f5f9;
-            -fx-border-color: #334155;
-            -fx-border-radius: 6;
-            -fx-background-radius: 6;
-            -fx-padding: 8;
-        """);
+        // Show/hide rows for both password fields
+        HBox regPassRow     = buildPasswordRow(regPassField);
+        HBox confirmPassRow = buildPasswordRow(confirmPassField);
 
         Label regError = new Label("");
         regError.setStyle("-fx-text-fill: #f87171; -fx-font-size: 12px;");
         regError.setWrapText(true);
 
-        Button registerBtn = new Button("Create Account");
-        registerBtn.setMaxWidth(Double.MAX_VALUE);
-        registerBtn.setStyle("""
-            -fx-background-color: #34d399;
-            -fx-text-fill: #0f172a;
-            -fx-font-weight: bold;
-            -fx-font-size: 14px;
-            -fx-padding: 12 0;
-            -fx-background-radius: 8;
-            -fx-cursor: hand;
-        """);
-
+        Button registerBtn = primaryBtn("Create Account", "#34d399", "#0f172a");
         registerBtn.setOnAction(e -> {
             regError.setText("");
-            User.Role role = roleBox.getValue().equals("Staff") ? User.Role.STAFF : User.Role.PASSENGER;
             try {
                 authService.register(
-                    regUsernameField.getText(), regPassField.getText(),
-                    confirmPassField.getText(), emailField.getText(),
-                    fullNameField.getText(), role
+                    regUsernameField.getText(),
+                    regPassField.getText(),
+                    confirmPassField.getText(),
+                    emailField.getText(),
+                    fullNameField.getText()
                 );
-                // Success — go back to login
-                showLoginPanel(card);
-                errorLabel.setText("✓ Account created! Please sign in.");
-                errorLabel.setStyle("-fx-text-fill: #34d399; -fx-font-size: 12px;");
+                populateLoginCard(card);
+                if (errorLabel != null) {
+                    errorLabel.setText("✓ Account created! Please sign in.");
+                    errorLabel.setStyle("-fx-text-fill: #34d399; -fx-font-size: 12px;");
+                }
             } catch (Exception ex) {
                 regError.setText("⚠ " + ex.getMessage());
             }
         });
 
-        // Back link
         Hyperlink backLink = new Hyperlink("← Back to Sign In");
         backLink.setStyle("-fx-text-fill: #38bdf8; -fx-font-size: 12px; -fx-border-color: transparent;");
-        backLink.setOnAction(e -> showLoginPanel(card));
+        backLink.setOnAction(e -> populateLoginCard(card));
 
-        form.getChildren().addAll(
-            fieldLabel("Full Name"), fullNameField,
-            fieldLabel("Username"), regUsernameField,
-            fieldLabel("Email"), emailField,
-            fieldLabel("Password"), regPassField,
-            fieldLabel("Confirm Password"), confirmPassField,
-            roleLbl, roleBox,
+        VBox formContent = new VBox(10);
+        formContent.getChildren().addAll(
+            fieldLabel("Full Name"),         fullNameField,
+            fieldLabel("Username"),          regUsernameField,
+            fieldLabel("Email"),             emailField,
+            fieldLabel("Password"),          regPassRow,
+            fieldLabel("Confirm Password"),  confirmPassRow,
             regError, registerBtn
         );
 
-        card.getChildren().addAll(logoBox, sep, form, backLink);
+        ScrollPane scroll = new ScrollPane(formContent);
+        scroll.setFitToWidth(true);
+        scroll.setPrefViewportHeight(340);
+        scroll.setMaxHeight(360);
+        scroll.setStyle("-fx-background-color: transparent; -fx-background: transparent;"
+                + "-fx-border-color: transparent;");
+
+        card.getChildren().addAll(logoBox, sep, scroll, backLink);
     }
 
-    private void showLoginPanel(VBox card) {
-        // Rebuild login view — simplest approach: reload getView() children
-        card.getChildren().clear();
+    // ─── SHOW / HIDE PASSWORD HELPER ─────────────────────────────────────────
 
-        VBox logoBox = new VBox(4);
-        logoBox.setAlignment(Pos.CENTER);
-        Label logo = new Label("✈ SkyBook");
-        logo.setStyle("-fx-font-size: 32px; -fx-font-weight: bold; -fx-text-fill: #38bdf8;");
-        Label tagline = new Label("Airline Ticket Management");
-        tagline.setStyle("-fx-font-size: 13px; -fx-text-fill: #64748b;");
-        logoBox.getChildren().addAll(logo, tagline);
+    /**
+     * Wraps a PasswordField in an HBox with an eye-icon toggle button.
+     * Clicking the button reveals the password as plain text (TextField overlay)
+     * and clicking again hides it back.
+     */
+    private HBox buildPasswordRow(PasswordField passwordField) {
+        // Visible-text field shown when "show" is active
+        TextField visibleField = new TextField();
+        visibleField.setPromptText(passwordField.getPromptText());
+        styleTextField(visibleField);
+        visibleField.setManaged(false);
+        visibleField.setVisible(false);
 
-        Separator sep = new Separator();
-        sep.setStyle("-fx-background-color: #334155;");
+        // Keep both fields in sync
+        passwordField.textProperty().addListener((obs, o, n) -> {
+            if (!visibleField.isFocused()) visibleField.setText(n);
+        });
+        visibleField.textProperty().addListener((obs, o, n) -> {
+            if (!passwordField.isFocused()) passwordField.setText(n);
+        });
 
-        VBox form = new VBox(14);
-        TextField usernameField = styledField("Enter your username");
-        PasswordField passwordField = new PasswordField();
-        passwordField.setPromptText("Enter your password");
-        styleTextField(passwordField);
-
-        errorLabel = new Label("");
-        errorLabel.setStyle("-fx-text-fill: #f87171; -fx-font-size: 12px;");
-
-        Button loginBtn = new Button("Sign In");
-        loginBtn.setMaxWidth(Double.MAX_VALUE);
-        loginBtn.setStyle("""
-            -fx-background-color: #38bdf8;
-            -fx-text-fill: #0f172a;
-            -fx-font-weight: bold;
+        Button eyeBtn = new Button("👁");
+        eyeBtn.setStyle("""
+            -fx-background-color: #334155;
+            -fx-text-fill: #94a3b8;
             -fx-font-size: 14px;
-            -fx-padding: 12 0;
-            -fx-background-radius: 8;
+            -fx-padding: 6 10;
+            -fx-background-radius: 6;
             -fx-cursor: hand;
+            -fx-min-width: 36px;
         """);
-        loginBtn.setOnAction(e -> doLogin(usernameField.getText(), passwordField.getText()));
-        passwordField.setOnAction(e -> doLogin(usernameField.getText(), passwordField.getText()));
 
-        HBox registerRow = new HBox(6);
-        registerRow.setAlignment(Pos.CENTER);
-        Label noAcct = new Label("Don't have an account?");
-        noAcct.setStyle("-fx-text-fill: #64748b; -fx-font-size: 12px;");
-        Hyperlink registerLink = new Hyperlink("Register here");
-        registerLink.setStyle("-fx-text-fill: #38bdf8; -fx-font-size: 12px; -fx-border-color: transparent;");
-        registerLink.setOnAction(e -> showRegisterPanel(card, loginBtn, form, usernameField, passwordField));
-        registerRow.getChildren().addAll(noAcct, registerLink);
+        final boolean[] showing = {false};
 
-        form.getChildren().addAll(
-            fieldLabel("Username"), usernameField,
-            fieldLabel("Password"), passwordField,
-            errorLabel, loginBtn
-        );
+        eyeBtn.setOnAction(e -> {
+            showing[0] = !showing[0];
+            if (showing[0]) {
+                // Show password
+                visibleField.setText(passwordField.getText());
+                passwordField.setManaged(false);
+                passwordField.setVisible(false);
+                visibleField.setManaged(true);
+                visibleField.setVisible(true);
+                eyeBtn.setText("🙈");
+                eyeBtn.setStyle(eyeBtn.getStyle().replace("#334155", "#38bdf8")
+                                                  .replace("#94a3b8", "#0f172a"));
+            } else {
+                // Hide password
+                passwordField.setText(visibleField.getText());
+                visibleField.setManaged(false);
+                visibleField.setVisible(false);
+                passwordField.setManaged(true);
+                passwordField.setVisible(true);
+                eyeBtn.setText("👁");
+                eyeBtn.setStyle(eyeBtn.getStyle().replace("#38bdf8", "#334155")
+                                                  .replace("#0f172a", "#94a3b8"));
+            }
+        });
 
-        VBox demoBox = new VBox(4);
-        demoBox.setStyle("-fx-background-color: #0f172a; -fx-background-radius: 6; -fx-padding: 10;");
-        Label demoTitle = new Label("Demo credentials:");
-        demoTitle.setStyle("-fx-text-fill: #475569; -fx-font-size: 11px; -fx-font-weight: bold;");
-        Label demoAdmin = new Label("admin / admin123  (ADMIN)");
-        Label demoStaff = new Label("staff1 / staff123  (STAFF)");
-        Label demoPax   = new Label("passenger / pass123  (PASSENGER)");
-        for (Label l : new Label[]{demoAdmin, demoStaff, demoPax})
-            l.setStyle("-fx-text-fill: #475569; -fx-font-size: 11px; -fx-font-family: monospace;");
-        demoBox.getChildren().addAll(demoTitle, demoAdmin, demoStaff, demoPax);
+        // Stack both fields in a StackPane so they occupy the same space
+        StackPane fieldStack = new StackPane(passwordField, visibleField);
+        HBox.setHgrow(fieldStack, Priority.ALWAYS);
 
-        card.getChildren().addAll(logoBox, sep, form, registerRow, demoBox);
+        HBox row = new HBox(8, fieldStack, eyeBtn);
+        row.setAlignment(Pos.CENTER_LEFT);
+        return row;
     }
 
-    // ─── HELPERS ─────────────────────────────────────────────────────────────────
+    // ─── LOGIN LOGIC ─────────────────────────────────────────────────────────
+
+    private void doLogin(String username, String password) {
+        if (errorLabel != null) errorLabel.setText("");
+        try {
+            authService.login(username, password);
+            onLoginSuccess.run();
+        } catch (Exception e) {
+            if (errorLabel != null) {
+                errorLabel.setStyle("-fx-text-fill: #f87171; -fx-font-size: 12px;");
+                errorLabel.setText("⚠ " + e.getMessage());
+                FadeTransition ft = new FadeTransition(Duration.millis(100), errorLabel);
+                ft.setFromValue(0); ft.setToValue(1); ft.play();
+            }
+        }
+    }
+
+    // ─── HELPERS ─────────────────────────────────────────────────────────────
+
+    private VBox buildLogo(String tagline) {
+        VBox box = new VBox(4);
+        box.setAlignment(Pos.CENTER);
+        Label logo = new Label("✈ SkyBook");
+        logo.setStyle("-fx-font-size: 30px; -fx-font-weight: bold; -fx-text-fill: #38bdf8;");
+        Label tag = new Label(tagline);
+        tag.setStyle("-fx-font-size: 13px; -fx-text-fill: #64748b;");
+        box.getChildren().addAll(logo, tag);
+        return box;
+    }
+
+    private Separator buildSep() {
+        Separator s = new Separator();
+        s.setStyle("-fx-background-color: #334155;");
+        return s;
+    }
+
+    private Button primaryBtn(String text, String bg, String fg) {
+        Button btn = new Button(text);
+        btn.setMaxWidth(Double.MAX_VALUE);
+        btn.setStyle("-fx-background-color:" + bg + ";-fx-text-fill:" + fg + ";-fx-font-weight:bold;"
+                   + "-fx-font-size:14px;-fx-padding:12 0;-fx-background-radius:8;-fx-cursor:hand;");
+        return btn;
+    }
 
     private Label fieldLabel(String text) {
         Label l = new Label(text);
@@ -344,7 +315,7 @@ public class LoginScreen {
     }
 
     private void styleTextField(Control tf) {
-        tf.setStyle("""
+        String base = """
             -fx-background-color: #0f172a;
             -fx-text-fill: #f1f5f9;
             -fx-prompt-text-fill: #475569;
@@ -353,47 +324,18 @@ public class LoginScreen {
             -fx-background-radius: 6;
             -fx-padding: 10;
             -fx-font-size: 13px;
-        """);
-        tf.focusedProperty().addListener((obs, old, focused) -> {
-            if (focused) {
-                tf.setStyle("""
-                    -fx-background-color: #0f172a;
-                    -fx-text-fill: #f1f5f9;
-                    -fx-prompt-text-fill: #475569;
-                    -fx-border-color: #38bdf8;
-                    -fx-border-radius: 6;
-                    -fx-background-radius: 6;
-                    -fx-padding: 10;
-                    -fx-font-size: 13px;
-                """);
-            } else {
-                tf.setStyle("""
-                    -fx-background-color: #0f172a;
-                    -fx-text-fill: #f1f5f9;
-                    -fx-prompt-text-fill: #475569;
-                    -fx-border-color: #334155;
-                    -fx-border-radius: 6;
-                    -fx-background-radius: 6;
-                    -fx-padding: 10;
-                    -fx-font-size: 13px;
-                """);
-            }
-        });
+        """;
+        String focused = base.replace("#334155", "#38bdf8");
+        tf.setStyle(base);
+        tf.focusedProperty().addListener((obs, old, f) -> tf.setStyle(f ? focused : base));
     }
 
     private Pane buildBackground() {
         Pane bg = new Pane();
-        // Decorative blurred circles done via CSS box-shadows / overlapping shapes
         javafx.scene.shape.Circle c1 = new javafx.scene.shape.Circle(200);
-        c1.setFill(Color.web("#38bdf820"));
-        c1.setLayoutX(100);
-        c1.setLayoutY(100);
-
+        c1.setFill(Color.web("#38bdf820")); c1.setLayoutX(100); c1.setLayoutY(100);
         javafx.scene.shape.Circle c2 = new javafx.scene.shape.Circle(150);
-        c2.setFill(Color.web("#a78bfa15"));
-        c2.setLayoutX(900);
-        c2.setLayoutY(600);
-
+        c2.setFill(Color.web("#a78bfa15")); c2.setLayoutX(900); c2.setLayoutY(600);
         bg.getChildren().addAll(c1, c2);
         return bg;
     }

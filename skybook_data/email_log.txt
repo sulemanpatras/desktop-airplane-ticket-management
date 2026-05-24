@@ -40,3 +40,21 @@ The SkyBook Team
 
 
 
+──────────────────────────────────────────
+Time    : 2026-05-24 04:08:42
+To      : john@example.com
+Subject : ✈ Booking Confirmed – TK10002
+Preview : Your Booking is Confirmed!Ticket IDTK10002PassengerJohn DoeFlightFL001Seat6BPrice Paid$8500.00Booked
+
+──────────────────────────────────────────
+Time    : 2026-05-24 04:09:23
+To      : john@example.com
+Subject : ✈ Booking Confirmed – TK10003
+Preview : Your Booking is Confirmed!Ticket IDTK10003PassengerJohn DoeFlightFL002Seat21APrice Paid$45000.00Book
+
+──────────────────────────────────────────
+Time    : 2026-05-24 04:15:56
+To      : john@example.com
+Subject : ✈ Booking Confirmed – TK10004
+Preview : Your Booking is Confirmed!Ticket IDTK10004PassengerJohn DoeFlightFL002Seat21BPrice Paid$45000.00Book
+

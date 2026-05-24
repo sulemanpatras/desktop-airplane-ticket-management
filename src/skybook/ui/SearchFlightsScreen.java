@@ -10,19 +10,27 @@ import skybook.exceptions.InvalidBookingException;
 import skybook.exceptions.NoSeatsAvailableException;
 import skybook.models.Flight;
 import skybook.services.BookingService;
+import skybook.services.GoogleCalendarService;
+import skybook.services.PdfService;
 import skybook.models.Ticket;
 
 import java.util.List;
 
 /**
  * Search Flights Screen.
- * Demonstrates: JavaFX TextFields, Buttons, ComboBox, GridPane, try-catch
+ *
+ * Updates:
+ *  - After booking, shows "📅 Add to Google Calendar" button.
+ *  - PDF/ticket is saved via FileChooser dialog (user picks destination).
  */
 public class SearchFlightsScreen {
 
     private final BookingService bookingService;
     private final Stage stage;
     private VBox resultsBox;
+
+    private final GoogleCalendarService calendarService = new GoogleCalendarService();
+    private final PdfService pdfService = new PdfService();
 
     public SearchFlightsScreen(BookingService bookingService, Stage stage) {
         this.bookingService = bookingService;
@@ -34,60 +42,34 @@ public class SearchFlightsScreen {
         view.setPadding(new Insets(28));
         view.setStyle("-fx-background-color: #0f172a;");
 
-        // Header
         Label title = new Label("Search Flights");
         title.setStyle("-fx-font-size: 26px; -fx-font-weight: bold; -fx-text-fill: #f1f5f9;");
         Label subtitle = new Label("Find and book your next adventure");
         subtitle.setStyle("-fx-text-fill: #94a3b8;");
 
-        // Search Panel
         GridPane searchGrid = new GridPane();
         searchGrid.setHgap(12);
         searchGrid.setVgap(10);
         searchGrid.setPadding(new Insets(20));
         searchGrid.setStyle("-fx-background-color: #1e293b; -fx-background-radius: 10;");
 
-        Label fromLbl = styledLabel("From");
         TextField fromField = styledField("e.g. Karachi");
-        Label toLbl = styledLabel("To");
-        TextField toField = styledField("e.g. Lahore");
+        TextField toField   = styledField("e.g. Lahore");
 
-        Button searchBtn = new Button("🔍 Search");
-        searchBtn.setStyle("""
-            -fx-background-color: #38bdf8;
-            -fx-text-fill: #0f172a;
-            -fx-font-weight: bold;
-            -fx-font-size: 13px;
-            -fx-padding: 9 22;
-            -fx-background-radius: 7;
-            -fx-cursor: hand;
-        """);
+        Button searchBtn  = actionBtn("🔍 Search",  "#38bdf8", "#0f172a");
+        Button showAllBtn = actionBtn("Show All",   "#334155", "#cbd5e1");
 
-        Button showAllBtn = new Button("Show All");
-        showAllBtn.setStyle("""
-            -fx-background-color: #334155;
-            -fx-text-fill: #cbd5e1;
-            -fx-font-size: 13px;
-            -fx-padding: 9 18;
-            -fx-background-radius: 7;
-            -fx-cursor: hand;
-        """);
-
-        searchGrid.add(fromLbl, 0, 0);
+        searchGrid.add(styledLabel("From"), 0, 0);
         searchGrid.add(fromField, 1, 0);
-        searchGrid.add(toLbl, 2, 0);
+        searchGrid.add(styledLabel("To"), 2, 0);
         searchGrid.add(toField, 3, 0);
-        HBox btnRow = new HBox(10, searchBtn, showAllBtn);
-        searchGrid.add(btnRow, 4, 0);
+        searchGrid.add(new HBox(10, searchBtn, showAllBtn), 4, 0);
 
-        // Results
         resultsBox = new VBox(12);
 
-        // Actions
         searchBtn.setOnAction(e -> doSearch(fromField.getText(), toField.getText()));
         showAllBtn.setOnAction(e -> { fromField.clear(); toField.clear(); doSearch("", ""); });
 
-        // Initial load
         doSearch("", "");
 
         ScrollPane scroll = new ScrollPane(resultsBox);
@@ -110,10 +92,7 @@ public class SearchFlightsScreen {
             resultsBox.getChildren().add(empty);
             return;
         }
-
-        for (Flight f : results) {
-            resultsBox.getChildren().add(buildFlightCard(f));
-        }
+        for (Flight f : results) resultsBox.getChildren().add(buildFlightCard(f));
     }
 
     private VBox buildFlightCard(Flight flight) {
@@ -121,7 +100,6 @@ public class SearchFlightsScreen {
         card.setPadding(new Insets(18));
         card.setStyle("-fx-background-color: #1e293b; -fx-background-radius: 10;");
 
-        // Top row: airline + seats badge
         HBox topRow = new HBox();
         topRow.setAlignment(Pos.CENTER_LEFT);
 
@@ -139,7 +117,6 @@ public class SearchFlightsScreen {
 
         topRow.getChildren().addAll(airline, spacer, seatsBadge);
 
-        // Route row
         HBox routeRow = new HBox(16);
         routeRow.setAlignment(Pos.CENTER);
 
@@ -160,8 +137,7 @@ public class SearchFlightsScreen {
 
         routeRow.getChildren().addAll(depBox, arrow, arrBox);
 
-        // Bottom row: date + price + book button
-        HBox bottomRow = new HBox();
+        HBox bottomRow = new HBox(10);
         bottomRow.setAlignment(Pos.CENTER_LEFT);
 
         Label date = new Label("📅 " + (flight.getDepartureTime().length() > 10 ?
@@ -174,18 +150,10 @@ public class SearchFlightsScreen {
         Label price = new Label(String.format("$%.0f", flight.getPrice()));
         price.setStyle("-fx-text-fill: #38bdf8; -fx-font-size: 20px; -fx-font-weight: bold;");
 
-        Button bookBtn = new Button("Book Now");
-        bookBtn.setStyle("""
-            -fx-background-color: #38bdf8;
-            -fx-text-fill: #0f172a;
-            -fx-font-weight: bold;
-            -fx-padding: 7 16;
-            -fx-background-radius: 6;
-            -fx-cursor: hand;
-        """);
+        Button bookBtn = actionBtn("Book Now", "#38bdf8", "#0f172a");
         bookBtn.setOnAction(e -> showBookingDialog(flight));
 
-        bottomRow.getChildren().addAll(date, sp2, price, new Label("   "), bookBtn);
+        bottomRow.getChildren().addAll(date, sp2, price, bookBtn);
 
         card.getChildren().addAll(topRow, routeRow, bottomRow);
         return card;
@@ -197,7 +165,6 @@ public class SearchFlightsScreen {
         dialog.setHeaderText(flight.getSource() + " → " + flight.getDestination() +
                 "  |  $" + String.format("%.0f", flight.getPrice()));
 
-        // Form
         GridPane form = new GridPane();
         form.setHgap(12);
         form.setVgap(14);
@@ -222,11 +189,14 @@ public class SearchFlightsScreen {
                             nameField.getText().trim(),
                             emailField.getText().trim()
                     );
-                    showSuccess("Booking Confirmed!",
-                            "Ticket: " + ticket.getId() + "\nSeat: " + ticket.getSeatNumber() +
-                            "\n\nA confirmation has been saved to email_log.txt\n" +
-                            "Your boarding pass is in skybook_data/tickets/");
-                    doSearch("", ""); // Refresh
+
+                    // Show save dialog for boarding pass
+                    String savedPath = pdfService.generateTicketPdf(ticket, flight, stage);
+
+                    // Show success with calendar option
+                    showBookingSuccess(ticket, flight, savedPath);
+                    doSearch("", "");
+
                 } catch (NoSeatsAvailableException ex) {
                     showError("No Seats Available", ex.getMessage());
                 } catch (FlightNotFoundException ex) {
@@ -240,21 +210,40 @@ public class SearchFlightsScreen {
         });
     }
 
-    private void showError(String title, String msg) {
-        Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(msg);
-        alert.showAndWait();
+    /**
+     * Shows a success alert with an "Add to Google Calendar" button.
+     */
+    private void showBookingSuccess(Ticket ticket, Flight flight, String savedPath) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Booking Confirmed!");
+        alert.setHeaderText("✈ Your ticket is booked!");
+        alert.setContentText(
+                "Ticket ID : " + ticket.getId() + "\n"
+              + "Seat      : " + ticket.getSeatNumber() + "\n"
+              + (savedPath != null ? "Saved to  : " + savedPath + "\n" : "")
+              + "\nA confirmation email has been sent."
+        );
+
+        // Custom "Add to Calendar" button
+        ButtonType calendarBtn = new ButtonType("📅 Add to Google Calendar", ButtonBar.ButtonData.LEFT);
+        alert.getButtonTypes().add(calendarBtn);
+
+        alert.showAndWait().ifPresent(btn -> {
+            if (btn == calendarBtn) {
+                calendarService.addFlightToCalendar(ticket, flight);
+            }
+        });
     }
 
-    private void showSuccess(String title, String msg) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle(title);
-        alert.setHeaderText(title);
-        alert.setContentText(msg);
-        alert.showAndWait();
+    private void showError(String title, String msg) {
+        Alert a = new Alert(Alert.AlertType.ERROR);
+        a.setTitle(title);
+        a.setHeaderText(null);
+        a.setContentText(msg);
+        a.showAndWait();
     }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private Label styledLabel(String text) {
         Label l = new Label(text);
@@ -279,5 +268,12 @@ public class SearchFlightsScreen {
         Label l = new Label(text);
         l.setStyle("-fx-text-fill: #94a3b8; -fx-font-size: 11px;");
         return l;
+    }
+
+    private Button actionBtn(String text, String bg, String fg) {
+        Button btn = new Button(text);
+        btn.setStyle("-fx-background-color: " + bg + "; -fx-text-fill: " + fg +
+                "; -fx-font-weight: bold; -fx-padding: 7 16; -fx-background-radius: 6; -fx-cursor: hand;");
+        return btn;
     }
 }

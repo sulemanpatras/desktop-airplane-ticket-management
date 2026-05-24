@@ -4,6 +4,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.stage.Window;
 import skybook.models.Flight;
 import skybook.models.Ticket;
 import skybook.services.BookingService;
@@ -13,14 +14,21 @@ import java.util.List;
 
 /**
  * All Bookings Screen (Admin).
- * Demonstrates: JavaFX TableView-style list, Labels, Buttons
+ * Updated: passes window owner to PdfService so Save dialog works correctly.
  */
 public class AllBookingsScreen {
 
     private final BookingService bookingService;
+    private final javafx.stage.Stage primaryStage;
 
-    public AllBookingsScreen(BookingService bookingService) {
+    public AllBookingsScreen(BookingService bookingService, javafx.stage.Stage primaryStage) {
         this.bookingService = bookingService;
+        this.primaryStage = primaryStage;
+    }
+
+    // Keep backward-compat constructor (no dialog)
+    public AllBookingsScreen(BookingService bookingService) {
+        this(bookingService, null);
     }
 
     public VBox getView() {
@@ -28,7 +36,6 @@ public class AllBookingsScreen {
         view.setPadding(new Insets(28));
         view.setStyle("-fx-background-color: #0f172a;");
 
-        // Header
         HBox header = new HBox();
         header.setAlignment(Pos.CENTER_LEFT);
 
@@ -51,33 +58,12 @@ public class AllBookingsScreen {
 
         header.getChildren().addAll(title, sp, reportBtn);
 
-        // Table header
         HBox tableHeader = buildRow("TICKET", "PASSENGER", "FLIGHT", "SEAT", "PRICE", "STATUS", true);
 
         List<Ticket> tickets = bookingService.getAllTickets();
         VBox rows = new VBox(4);
         rows.getChildren().add(tableHeader);
 
-        for (Ticket t : tickets) {
-            String statusColor = t.isConfirmed() ? "#34d399" : "#f87171";
-            HBox row = buildRow(
-                t.getId(),
-                t.getPassengerName(),
-                t.getFlightId(),
-                t.getSeatNumber(),
-                String.format("$%.0f", t.getPricePaid()),
-                t.getStatus().toString(),
-                false
-            );
-            // Color-code status cell
-            if (!rows.getChildren().isEmpty()) {
-                rows.getChildren().add(row);
-            }
-        }
-
-        // Re-render properly
-        rows.getChildren().clear();
-        rows.getChildren().add(tableHeader);
         for (Ticket t : tickets) {
             rows.getChildren().add(buildTicketRow(t));
         }
@@ -153,13 +139,18 @@ public class AllBookingsScreen {
     private void generateReport() {
         PdfService pdfService = new PdfService();
         List<Ticket> tickets = bookingService.getAllTickets();
-        List<Flight> flights  = bookingService.getAllFlights();
-        String path = pdfService.generateBookingReport(tickets, flights);
+        List<Flight> flights = bookingService.getAllFlights();
 
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Report Generated");
-        alert.setHeaderText("Booking report saved!");
-        alert.setContentText("File saved to:\n" + path);
-        alert.showAndWait();
+        // Show save dialog — user picks where to save
+        Window owner = primaryStage != null ? primaryStage : null;
+        String path = pdfService.generateBookingReport(tickets, flights, owner);
+
+        if (path != null) {
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Report Generated");
+            alert.setHeaderText("Booking report saved!");
+            alert.setContentText("File saved to:\n" + path);
+            alert.showAndWait();
+        }
     }
 }

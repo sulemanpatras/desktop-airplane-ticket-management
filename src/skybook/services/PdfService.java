@@ -1,99 +1,205 @@
 package skybook.services;
 
+import javafx.stage.FileChooser;
+import javafx.stage.Stage;
+import javafx.stage.Window;
 import skybook.models.Flight;
 import skybook.models.Ticket;
 
 import java.io.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
- * PdfService: Generates ticket PDFs.
+ * PdfService: Generates ticket/report documents.
  *
- * Implementation uses plain-text "boarding pass" files saved to disk.
- * If iText (com.itextpdf:itext7-core) is on the classpath, it produces a real PDF.
- * Otherwise it gracefully falls back to a richly formatted .txt receipt.
+ * NOW WITH: FileChooser dialog so the user picks where to save the file,
+ * exactly like Chrome's download dialog.
  *
- * To enable real PDFs: add itext7 jar to your classpath and uncomment the
- * generateWithIText() method below.
+ * Uses plain-text "boarding pass" files (.txt).
+ * To generate real PDFs: add iText7 (com.itextpdf:itext7-core) to classpath
+ * and swap the PrintWriter block with the iText7 PdfWriter block (see comments below).
  *
- * Demonstrates: File Handling, Exception Handling, Service layer
+ * Demonstrates: File Handling (FileChooser), Exception Handling, Service layer
  */
 public class PdfService {
 
-    private static final String PDF_DIR = "skybook_data/tickets";
+    private static final String DEFAULT_DIR = "skybook_data/tickets";
     private static final DateTimeFormatter FMT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     public PdfService() {
-        new File(PDF_DIR).mkdirs();
+        new File(DEFAULT_DIR).mkdirs();
+    }
+
+    // ─── TICKET PDF ──────────────────────────────────────────────────────────
+
+    /**
+     * Generates a boarding-pass text file.
+     * Shows a FileChooser so the user picks the save location (like Chrome downloads).
+     *
+     * @param ticket  the ticket to print
+     * @param flight  the associated flight
+     * @param owner   the JavaFX window to parent the dialog to (pass primaryStage)
+     * @return        the saved file path, or null if user cancelled
+     */
+    public String generateTicketPdf(Ticket ticket, Flight flight, Window owner) {
+        // Default filename
+        String defaultName = "Ticket_" + ticket.getId() + ".txt";
+
+        File chosen = showSaveDialog(owner, defaultName, "Ticket Files (*.txt)", "*.txt");
+        if (chosen == null) {
+            // User cancelled — silently fall back to default location
+            chosen = new File(DEFAULT_DIR + "/" + defaultName);
+        }
+
+        return writeTicketFile(ticket, flight, chosen);
     }
 
     /**
-     * Generates a ticket document for the given ticket and flight.
-     * Saves to skybook_data/tickets/<ticketId>.txt
+     * Overload for headless / background use (no dialog).
      */
     public String generateTicketPdf(Ticket ticket, Flight flight) {
-        String fileName = PDF_DIR + "/" + ticket.getId() + ".txt";
-        try (PrintWriter pw = new PrintWriter(new FileWriter(fileName))) {
-            pw.println(buildBoardingPass(ticket, flight));
-            System.out.println("[PdfService] Ticket saved → " + fileName);
-        } catch (IOException e) {
-            System.err.println("[PdfService] Failed to save ticket: " + e.getMessage());
+        File out = new File(DEFAULT_DIR + "/Ticket_" + ticket.getId() + ".txt");
+        return writeTicketFile(ticket, flight, out);
+    }
+
+    // ─── BOOKING REPORT ──────────────────────────────────────────────────────
+
+    /**
+     * Generates a summary report.
+     * Shows a FileChooser so the user picks the save location.
+     */
+    public String generateBookingReport(List<Ticket> tickets, List<Flight> flights, Window owner) {
+        String defaultName = "SkyBook_Report_" +
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmm")) + ".txt";
+
+        File chosen = showSaveDialog(owner, defaultName, "Report Files (*.txt)", "*.txt");
+        if (chosen == null) {
+            chosen = new File(DEFAULT_DIR + "/" + defaultName);
         }
-        return fileName;
+
+        return writeReportFile(tickets, flights, chosen);
     }
 
     /**
-     * Generates a summary report of all tickets.
+     * Overload for headless use (no dialog).
      */
-    public String generateBookingReport(java.util.List<Ticket> tickets,
-                                        java.util.List<Flight> flights) {
-        String fileName = PDF_DIR + "/booking_report_" +
+    public String generateBookingReport(List<Ticket> tickets, List<Flight> flights) {
+        String defaultName = "SkyBook_Report_" +
                 LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmm")) + ".txt";
-
-        try (PrintWriter pw = new PrintWriter(new FileWriter(fileName))) {
-            pw.println("╔" + "═".repeat(58) + "╗");
-            pw.println("║          SKYBOOK – BOOKING REPORT                        ║");
-            pw.println("║  Generated: " + LocalDateTime.now().format(FMT) +
-                       "                              ║");
-            pw.println("╚" + "═".repeat(58) + "╝");
-            pw.println();
-
-            int confirmed = 0;
-            double totalRevenue = 0;
-
-            for (Ticket t : tickets) {
-                Flight f = flights.stream()
-                        .filter(fl -> fl.getId().equals(t.getFlightId()))
-                        .findFirst().orElse(null);
-
-                pw.printf("  %-10s | %-20s | %-8s | %-6s | $%-10.2f%n",
-                        t.getId(), t.getPassengerName(),
-                        t.getFlightId(), t.getSeatNumber(), t.getPricePaid());
-
-                if (t.isConfirmed()) {
-                    confirmed++;
-                    totalRevenue += t.getPricePaid();
-                }
-            }
-
-            pw.println();
-            pw.println("─".repeat(60));
-            pw.printf("  Total Tickets   : %d%n", tickets.size());
-            pw.printf("  Confirmed       : %d%n", confirmed);
-            pw.printf("  Cancelled       : %d%n", tickets.size() - confirmed);
-            pw.printf("  Total Revenue   : $%.2f%n", totalRevenue);
-            pw.println("─".repeat(60));
-
-            System.out.println("[PdfService] Report saved → " + fileName);
-        } catch (IOException e) {
-            System.err.println("[PdfService] Failed to generate report: " + e.getMessage());
-        }
-        return fileName;
+        File out = new File(DEFAULT_DIR + "/" + defaultName);
+        return writeReportFile(tickets, flights, out);
     }
 
-    // ─── BOARDING PASS BUILDER ──────────────────────────────────────────────────
+    // ─── FILE CHOOSER ────────────────────────────────────────────────────────
+
+    /**
+     * Shows a native Save File dialog (exactly like Chrome's download prompt).
+     *
+     * @param owner        parent window
+     * @param defaultName  suggested filename
+     * @param description  extension description shown in the filter dropdown
+     * @param extension    e.g. "*.txt" or "*.pdf"
+     * @return             the chosen File, or null if user cancelled
+     */
+    public static File showSaveDialog(Window owner, String defaultName,
+                                      String description, String extension) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Save File – SkyBook");
+        chooser.setInitialFileName(defaultName);
+
+        // Start in user's home/Downloads if it exists
+        File downloads = new File(System.getProperty("user.home") + "/Downloads");
+        if (downloads.exists()) {
+            chooser.setInitialDirectory(downloads);
+        } else {
+            chooser.setInitialDirectory(new File(System.getProperty("user.home")));
+        }
+
+        chooser.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter(description, extension),
+            new FileChooser.ExtensionFilter("All Files", "*.*")
+        );
+
+        return chooser.showSaveDialog(owner);
+    }
+
+    // ─── WRITERS ─────────────────────────────────────────────────────────────
+
+    private String writeTicketFile(Ticket ticket, Flight flight, File outFile) {
+        try {
+            outFile.getParentFile().mkdirs();
+            try (PrintWriter pw = new PrintWriter(new FileWriter(outFile))) {
+                pw.println(buildBoardingPass(ticket, flight));
+            }
+            System.out.println("[PdfService] Ticket saved → " + outFile.getAbsolutePath());
+            return outFile.getAbsolutePath();
+        } catch (IOException e) {
+            System.err.println("[PdfService] Failed to save ticket: " + e.getMessage());
+            return null;
+        }
+
+        /*
+         * ── iText7 PDF block (uncomment if iText7 is on classpath) ──────────
+         * import com.itextpdf.kernel.pdf.*;
+         * import com.itextpdf.layout.*;
+         * import com.itextpdf.layout.element.*;
+         *
+         * PdfWriter writer = new PdfWriter(outFile);
+         * PdfDocument pdfDoc = new PdfDocument(writer);
+         * Document doc = new Document(pdfDoc);
+         * doc.add(new Paragraph("SKYBOOK BOARDING PASS").setBold().setFontSize(18));
+         * doc.add(new Paragraph("Ticket: " + ticket.getId()));
+         * // ... add all fields
+         * doc.close();
+         * ────────────────────────────────────────────────────────────────────
+         */
+    }
+
+    private String writeReportFile(List<Ticket> tickets, List<Flight> flights, File outFile) {
+        try {
+            outFile.getParentFile().mkdirs();
+            try (PrintWriter pw = new PrintWriter(new FileWriter(outFile))) {
+                pw.println("╔" + "═".repeat(58) + "╗");
+                pw.println("║          SKYBOOK – BOOKING REPORT                        ║");
+                pw.println("║  Generated: " + LocalDateTime.now().format(FMT) +
+                           "                              ║");
+                pw.println("╚" + "═".repeat(58) + "╝");
+                pw.println();
+                pw.printf("  %-10s | %-20s | %-8s | %-6s | %s%n",
+                        "TICKET", "PASSENGER", "FLIGHT", "SEAT", "PRICE");
+                pw.println("  " + "─".repeat(58));
+
+                int confirmed = 0;
+                double totalRevenue = 0;
+
+                for (Ticket t : tickets) {
+                    pw.printf("  %-10s | %-20s | %-8s | %-6s | $%-10.2f  [%s]%n",
+                            t.getId(), t.getPassengerName(),
+                            t.getFlightId(), t.getSeatNumber(),
+                            t.getPricePaid(), t.getStatus());
+                    if (t.isConfirmed()) { confirmed++; totalRevenue += t.getPricePaid(); }
+                }
+
+                pw.println();
+                pw.println("─".repeat(60));
+                pw.printf("  Total Tickets   : %d%n", tickets.size());
+                pw.printf("  Confirmed       : %d%n", confirmed);
+                pw.printf("  Cancelled       : %d%n", tickets.size() - confirmed);
+                pw.printf("  Total Revenue   : $%.2f%n", totalRevenue);
+                pw.println("─".repeat(60));
+            }
+            System.out.println("[PdfService] Report saved → " + outFile.getAbsolutePath());
+            return outFile.getAbsolutePath();
+        } catch (IOException e) {
+            System.err.println("[PdfService] Failed to generate report: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // ─── BOARDING PASS ────────────────────────────────────────────────────────
 
     private String buildBoardingPass(Ticket ticket, Flight flight) {
         String border = "═".repeat(54);

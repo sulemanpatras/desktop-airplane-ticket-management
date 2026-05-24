@@ -1,0 +1,42 @@
+════════════════════════════════════════════════════════════
+TO      : john@example.com
+SUBJECT : ✈ Booking Confirmed – TK10001
+SENT AT : 2026-05-24 00:01:38
+────────────────────────────────────────────────────────────
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FROM    : noreply@skybook.com
+TO      : John Doe
+DATE    : 2026-05-24 00:01:38
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Dear John Doe,
+
+Your booking is confirmed! Here are your details:
+
+
+══════════════════════════════════════════════════
+           ✈  SKYBOOK BOARDING PASS  ✈
+══════════════════════════════════════════════════
+  Ticket ID  : TK10001
+  Passenger  : John Doe
+  Email      : john@example.com
+  Flight     : FL001
+  Route      : Karachi → Lahore
+  Airline    : PIAw
+  Departure  : 2025-06-10 08:00
+  Seat       : 6A
+  Price Paid : $8500.00
+  Booked At  : 2026-05-24 00:01
+  Status     : CONFIRMED
+══════════════════════════════════════════════════
+
+Thank you for flying with SkyBook!
+For support, reply to this email or call +92-21-SKYBOOK.
+
+
+Best regards,
+The SkyBook Team
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+

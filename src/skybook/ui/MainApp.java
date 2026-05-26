@@ -34,6 +34,15 @@ public class MainApp extends Application {
         stage.setMinWidth(960);
         stage.setMinHeight(660);
 
+        // Load custom taskbar and window icon
+        try {
+            stage.getIcons().add(new javafx.scene.image.Image(
+                getClass().getResourceAsStream("/skybook/assets/images/airplane.png")
+            ));
+        } catch (Exception e) {
+            System.err.println("[MainApp] Could not load app icon: " + e.getMessage());
+        }
+
         showLoginScreen();
         stage.show();
     }

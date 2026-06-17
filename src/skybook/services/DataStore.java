@@ -190,7 +190,7 @@ public class DataStore {
 
     private void seedAdmins() throws IOException {
         try (PrintWriter pw = new PrintWriter(new FileWriter(ADMINS_FILE, false))) {
-            pw.println("A001,Admin User,admin@skybook.com,+92-21-0000000,ADMIN123,Operations");
+            pw.println("A001,Admin User,sulemanpatras2@gmail.com,+92-21-0000000,ADMIN123,Operations");
         }
         System.out.println("[DataStore] Seeded admins.csv");
     }

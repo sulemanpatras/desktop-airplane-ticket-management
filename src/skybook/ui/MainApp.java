@@ -51,7 +51,7 @@ public class MainApp extends Application {
 
     private void showLoginScreen() {
         LoginScreen loginScreen = new LoginScreen(authService, this::showMainScreen);
-        primaryStage.setScene(new Scene(loginScreen.getView(), 1000, 680));
+        swapScene(new Scene(loginScreen.getView(), 1000, 680));
     }
 
     private void showMainScreen() {
@@ -62,7 +62,38 @@ public class MainApp extends Application {
         User user = authService.getCurrentUser();
         root.setCenter(defaultView(user));
 
-        primaryStage.setScene(new Scene(root, 1000, 680));
+        swapScene(new Scene(root, 1000, 680));
+    }
+
+    /**
+     * Replaces the stage's scene while preserving its current window state
+     * (maximized or exact bounds). Setting a new Scene with explicit
+     * width/height can otherwise force JavaFX to resize a maximized window
+     * back down — this captures state first and reasserts it on the next
+     * pulse so the swap is invisible to the user.
+     */
+    private void swapScene(Scene newScene) {
+        boolean wasMaximized = primaryStage.isMaximized();
+        double x = primaryStage.getX();
+        double y = primaryStage.getY();
+        double w = primaryStage.getWidth();
+        double h = primaryStage.getHeight();
+
+        primaryStage.setScene(newScene);
+
+        if (wasMaximized) {
+            // Re-apply after the new scene has been laid out, otherwise the
+            // scene's own preferred size can win the race and the window
+            // visibly drops out of maximized state for a frame.
+            javafx.application.Platform.runLater(() -> {
+                primaryStage.setMaximized(true);
+            });
+        } else {
+            primaryStage.setX(x);
+            primaryStage.setY(y);
+            primaryStage.setWidth(w);
+            primaryStage.setHeight(h);
+        }
     }
 
     /**
@@ -127,8 +158,6 @@ public class MainApp extends Application {
                     sectionLabel("STAFF"),
                     navBtn("📋  Overview",       root,
                         () -> root.setCenter(new StaffOverviewScreen(bookingService).getView())),
-                    navBtn("🔍  Search Flights", root,
-                        () -> root.setCenter(new SearchFlightsScreen(bookingService, primaryStage).getView())),
                     navBtn("✈  Manage Flights",  root,
                         () -> root.setCenter(new ManageFlightsScreen(bookingService).getView())),
                     navBtn("👤  My Profile",     root,
@@ -142,8 +171,6 @@ public class MainApp extends Application {
                     sectionLabel("ADMIN"),
                     navBtn("📊  Dashboard",      root,
                         () -> root.setCenter(new DashboardScreen(bookingService).getView())),
-                    navBtn("🔍  Search Flights", root,
-                        () -> root.setCenter(new SearchFlightsScreen(bookingService, primaryStage).getView())),
                     navBtn("✈  Manage Flights",  root,
                         () -> root.setCenter(new ManageFlightsScreen(bookingService).getView())),
                     navBtn("👥  All Bookings",   root,

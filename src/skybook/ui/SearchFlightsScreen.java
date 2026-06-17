@@ -231,6 +231,16 @@ public class SearchFlightsScreen {
 
         dialog.showAndWait().ifPresent(btn -> {
             if (btn == ButtonType.OK) {
+                // ── Stripe test-mode card payment step ─────────────────────
+                // Card is validated for real against Stripe (Luhn, expiry,
+                // CVC, decline-test numbers) but no charge is captured.
+                // Booking only proceeds if the card passes validation.
+                CardPaymentDialog paymentDialog = new CardPaymentDialog();
+                boolean paid = paymentDialog.showAndValidate(flight.getPrice(), "$");
+                if (!paid) {
+                    return; // user cancelled or card failed validation
+                }
+
                 try {
                     Ticket ticket = bookingService.bookTicket(
                             flight.getId(),

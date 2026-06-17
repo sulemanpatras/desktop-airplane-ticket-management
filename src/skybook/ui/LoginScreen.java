@@ -98,7 +98,7 @@ public class LoginScreen {
         demoTitle.setStyle("-fx-text-fill: #475569; -fx-font-size: 11px; -fx-font-weight: bold;");
         for (Label l : new Label[]{
                 new Label("admin / admin123  (ADMIN)"),
-                new Label("staff1 / staff123  (STAFF)"),
+                new Label("staff / staff123  (STAFF)"),
                 new Label("passenger / pass123  (PASSENGER)")}) {
             l.setStyle("-fx-text-fill: #475569; -fx-font-size: 11px; -fx-font-family: monospace;");
             demoBox.getChildren().add(l);

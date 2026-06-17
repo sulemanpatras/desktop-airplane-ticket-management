@@ -28,7 +28,7 @@ public class EmailService {
     private static final String USERNAME   = "sulemanpatras2@gmail.com";
     private static final String PASSWORD   = "mouf zvtb uvxu yjjy";
     private static final String FROM_NAME  = "SkyBook Airlines";
-    private static final String ADMIN_EMAIL = "admin@skybook.com";   // FIX 3/4: admin recipient
+    private static final String ADMIN_EMAIL = "sulemanpatras2@gmail.com";   // FIX 3/4: admin recipient
 
     private static final String LOG_FILE = "skybook_data/email_log.txt";
     private static final DateTimeFormatter FMT =

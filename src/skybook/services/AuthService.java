@@ -341,7 +341,7 @@ public class AuthService {
         if (!users.isEmpty()) return;
         try {
             register("admin",     "admin123", "admin123", "sulemanpatras2@gmail.com",    "System Admin",   User.Role.ADMIN);
-            register("staff1",    "staff123", "staff123", "burhansyed98@gmail.com",    "Ground Staff",   User.Role.STAFF);
+            register("staff",    "staff123", "staff123", "burhansyed98@gmail.com",    "Ground Staff",   User.Role.STAFF);
             register("passenger", "pass123",  "pass123",  "thunderbyte438@gmail.com","John Passenger", User.Role.PASSENGER);
             System.out.println("[AuthService] Default users seeded.");
         } catch (Exception e) {
